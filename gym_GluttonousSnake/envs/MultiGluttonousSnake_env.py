@@ -4,14 +4,14 @@ import pygame
 import random
 
 
-class GluttonousSnakeEnv(gym.Env):
+class MultiGluttonousSnakeEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
     def __init__(self):
         self.field_width, self.field_height = 30, 30
         self.cell_width, self.cell_height = 20, 20
         self.max_step = 2000
-        self.food_produce_interval = 15
+        self.food_produce_interval = 20
         self.last_food_produce = -1
         self.now_step = 0
         self.colors_for_foods = (
@@ -19,14 +19,7 @@ class GluttonousSnakeEnv(gym.Env):
             pygame.Color(100, 100, 100), pygame.Color(100, 0, 200))
 
     def step(self, action):
-        if action == 0:
-            self.snake.up()
-        elif action == 1:
-            self.snake.left()
-        elif action == 2:
-            self.snake.right()
-        elif action == 3:
-            self.snake.down()
+        reward = 0
 
         self.screen.fill((255, 255, 255))
         self.now_step += 1
@@ -35,22 +28,45 @@ class GluttonousSnakeEnv(gym.Env):
             self.produceFood()
             self.last_food_produce = t
 
-        self.drawFoods()
-        self.snake.update(self.screen, self.foods, self.field_map)
+        if not self.snake.update_direc(action):
+            reward -= 1
+        self.snake.new_point()
+        if not self.snake.isLegal() or self.snake.isKill(self.enemy):
+            self.snake.game_over = True
+        else:
+            self.snake.update(self.screen, self.foods, self.field_map)
         done = self.snake.game_over
+
+        dead_snake_count = 0
+        for s in self.enemy:
+            s.update_direc(random.randint(0,3))
+            s.new_point()
+            if not s.isLegal() or s.isKill(self.enemy) or s.isKill([self.snake]):
+                s.becomefood(self.foods, self.field_map)
+                self.enemy.pop(self.enemy.index(s))
+                dead_snake_count += 1
+                continue
+
+            s.update(self.screen, self.foods, self.field_map)
+
+        for i in range(dead_snake_count):
+            self.enemy.append(Snake(True))
+
+        self.drawFoods()
 
         pygame.display.flip()
         pygame.display.update()
         image_data = pygame.surfarray.array3d(pygame.display.get_surface())
 
         if not done:
-            reward = self.snake.get_lenth() - self.last_lenth
-            if reward > 0:
+            l = self.snake.get_lenth() - self.last_lenth
+            if l > 0:
                 self.last_lenth = self.snake.get_lenth()
+                reward += 1
         else:
-            reward = -100
+            reward -= 100
 
-        if self.now_step == self.max_step - 1:
+        if self.now_step == self.max_step:
             done = True
 
         state = image_data
@@ -67,14 +83,19 @@ class GluttonousSnakeEnv(gym.Env):
         self.field_map = [[0 for i in range(self.field_width)] for j in range(self.field_height)]
         self.snake = Snake()
         self.last_lenth = 1
-
         self.now_step = 0
 
-        self.screen.fill((255, 255, 255))
-        self.snake.draw(self.screen)
-        for i in range(2):
-            self.produceFood()
+        self.enemy = []
+        for i in range(5):
+            self.enemy.append(Snake(True))
+            #print(self.enemy[i].color)
 
+        self.screen.fill((255, 255, 255))
+
+        self.snake.draw(self.screen)
+        for s in self.enemy:
+            s.draw(self.screen)
+            self.produceFood()
         self.drawFoods()
 
         pygame.display.flip()
@@ -110,7 +131,6 @@ class GluttonousSnakeEnv(gym.Env):
         exit(0)
 
 
-
 class Snake():
     def __init__(self, is_enemy=False):
         self.field_width, self.field_height = 30, 30
@@ -120,14 +140,18 @@ class Snake():
         # self.color = random.choice(define.ALL_COLOR)
         self.color = pygame.Color(0, self.color_degree, 0)
         self.speed = 300
-        self.last_move = 0
-        self.body = [(10, 10)]
+        self.body = []
         self.game_over = False
-        if is_enemy:
-            self.position = random.randrange(300, 1300), random.randrange(200, 600)
-        else:
-            self.position = random.randrange(700, 900), random.randrange(350, 450)
         self.is_enemy = is_enemy
+        self.killed = 0
+        if is_enemy:
+            self.color = random.choice(ALL_COLOR)
+            self.position = random.randrange(5, 25), random.randrange(5, 25)
+        else:
+            self.position = random.randrange(10, 20), random.randrange(10, 20)
+        self.body.append(self.position)
+        self.is_enemy = is_enemy
+        #print(self.position)
 
         if not is_enemy:
             self.speed = 480
@@ -149,38 +173,45 @@ class Snake():
                 pygame.draw.rect(screen, self.color, (x * self.cell_width, y * self.cell_height, self.cell_width, self.cell_height))
             index += 1
 
-    def isLegal(self, nx, ny):
+    def isLegal(self):
+        nx = self.nx
+        ny = self.ny
         if nx < 0 or ny < 0 or nx >= self.field_width or ny >= self.field_height:
             return False
-        index = 0
-        for (x, y) in self.body:
-            if index == len(self.body) - 1:
-                continue
-            if (nx, ny) == (x, y):
-                return False
-            index += 1
+        if len(self.body) > 1 and (nx, ny) == self.body[1]:
+            return False
         return True
 
-    def left(self):
-        self.direction = 'L'
-        self.last_move = -1
+    def isKill(self, enemy):
+        nx = self.nx
+        ny = self.ny
+        for s in enemy:
+            if s.body[0] == self.body[0]:
+                continue
+            for (x, y) in s.body:
+                if (nx, ny) == (x, y):
+                    self.killed = 1
+                    return True
+        return False
 
-    def right(self):
-        self.direction = 'R'
-        self.last_move = -1
+    def update_direc(self, action):
+        if action == 0 and (self.direction != 'D' or len(self.body) == 1):
+            #self.snake.up()
+            self.direction = 'U'
+        elif action == 1 and (self.direction != 'R' or len(self.body) == 1):
+            #self.snake.left()
+            self.direction = 'L'
+        elif action == 2 and (self.direction != 'L' or len(self.body) == 1):
+            #self.snake.right()
+            self.direction = 'R'
+        elif action == 3 and (self.direction != 'U' or len(self.body) == 1):
+            #self.snake.down()
+            self.direction = 'D'
+        else:
+            return False
+        return True
 
-    def down(self):
-        self.direction = 'D'
-        self.last_move = -1
-
-    def up(self):
-        self.direction = 'U'
-        self.last_move = -1
-
-    def update(self, screen, foods, field_map):
-        if self.last_move != -1:
-            return
-
+    def new_point(self):
         (hx, hy) = self.body[0]
         if self.direction == 'L':
             (nx, ny) = (hx - 1, hy)
@@ -190,9 +221,12 @@ class Snake():
             (nx, ny) = (hx, hy - 1)
         elif self.direction == 'D':
             (nx, ny) = (hx, hy + 1)
-        if not self.isLegal(nx, ny):
-            self.game_over = True
-            return
+        self.nx = nx
+        self.ny = ny
+
+    def update(self, screen, foods, field_map):
+        nx = self.nx
+        ny = self.ny
 
         self.body.insert(0, (nx, ny))
         if field_map[ny][nx] == 1:
@@ -209,9 +243,39 @@ class Snake():
                     foods.pop(index)
                     break
                 index += 1
-        elif len(self.body) > 2:
+        elif len(self.body) > 5:
             self.body.pop()
-        self.last_move = 0
+
         self.draw(screen)
 
+    def becomefood(self, foods, field_map):
+        for (x, y) in self.body:
+            field_map[y][x] = 1
+            foods.append((x, y, colors_for_foods[random.randint(0, len(colors_for_foods) - 1)]))
 
+
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+LIGHT_PINK = (255, 182, 193)
+STEEL_BLUE = (70, 130, 180)
+CRIMSON = (220, 20, 60)
+VIOLET = (238, 130, 238)
+SLATEBLUE = (106, 90, 205)
+CYAN = (0, 255, 255)
+AUQAMARIN = (127, 255, 170)
+LIME = (0, 255, 0)
+YELLOW = (255, 255, 0)
+OLIVE = (128, 128, 0)
+CORNISLK = (255, 248, 220)
+ORANGE = (255, 165, 0)
+CORAL = (255, 127, 80)
+
+SKY_BLUE = (135, 206, 235, 255)
+GOLD = (255, 215, 0, 255)
+MAROON = (128, 0, 0, 255)
+ALL_COLOR = (LIGHT_PINK, STEEL_BLUE, CRIMSON, VIOLET, SLATEBLUE, CYAN,
+             AUQAMARIN, YELLOW, OLIVE, CORNISLK, ORANGE, CORAL)
+
+colors_for_foods = (
+            pygame.Color(255, 0, 0), pygame.Color(0, 0, 255),
+            pygame.Color(100, 100, 100), pygame.Color(100, 0, 200))
