@@ -1,2 +1,3 @@
 from gym_GluttonousSnake.envs.GluttonousSnake_env import GluttonousSnakeEnv
 from gym_GluttonousSnake.envs.MultiGluttonousSnake_env import MultiGluttonousSnakeEnv
+from gym_GluttonousSnake.envs.MultiGluttonousSnake2_env import MultiGluttonousSnake2Env

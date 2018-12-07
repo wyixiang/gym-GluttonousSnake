@@ -8,3 +8,7 @@ register(
     id='Glu-v1',
     entry_point='gym_GluttonousSnake.envs:MultiGluttonousSnakeEnv',
 )
+register(
+    id='Glu-v2',
+    entry_point='gym_GluttonousSnake.envs:MultiGluttonousSnake2Env',
+)

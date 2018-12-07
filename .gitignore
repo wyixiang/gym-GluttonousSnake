@@ -8,3 +8,5 @@ gym_GluttonousSnake/envs/define\.py
 gym_GluttonousSnake/envs/game\.py
 
 \.idea/
+
+game/test\.py

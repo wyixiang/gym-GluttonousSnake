@@ -9,7 +9,7 @@ class Snake():
     def __init__(self, is_enemy=False):
         self.field_width, self.field_height = 30, 30
         self.cell_width, self.cell_height = 20, 20
-        self.direction = 'D'
+        self.direction = 270.0
         self.color_degree = 0
         # self.color = random.choice(define.ALL_COLOR)
         self.color = pygame.Color(0, self.color_degree, 0)
@@ -18,6 +18,7 @@ class Snake():
         self.game_over = False
         self.is_enemy = is_enemy
         self.killed = 0
+        self.eat_count = 5
         if is_enemy:
             self.color = random.choice(define.ALL_COLOR)
             self.position = random.randrange(5, 25), random.randrange(5, 25)
@@ -31,6 +32,16 @@ class Snake():
             self.speed = 480
         self.path = [self.position] * 100
 
+        self.head = pygame.image.load("circle.png")
+        self.head = pygame.transform.scale(self.head, (cell_width, cell_height))
+        pygame.draw.circle(self.head, self.color, [int(0.50 * cell_width), int(0.5 * cell_height)], int(cell_width / 2))
+        pygame.draw.circle(self.head, define.WHITE, [int(0.25 * cell_width), int(0.5 * cell_height)], int(cell_width / 4))
+        pygame.draw.circle(self.head, define.WHITE, [int(0.75 * cell_width), int(0.5 * cell_height)], int(cell_width / 4))
+        pygame.draw.circle(self.head, define.BLACK, [int(0.25 * cell_width), int(0.5 * cell_height)], int(cell_width / 6))
+        pygame.draw.circle(self.head, define.BLACK, [int(0.75 * cell_width), int(0.5 * cell_height)], int(cell_width / 6))
+        self.newhead = self.head
+
+
     def get_lenth(self):
         return len(self.body)
 
@@ -39,12 +50,13 @@ class Snake():
         for (x, y) in self.body:
             if index == 0:
                 # head
-                pygame.draw.circle(screen, self.color, [int((x + 0.5) * self.cell_width), int((y + 0.5) * self.cell_height)],
-                                   int(self.cell_width / 2))
+                screen.blit(self.newhead, [int((x ) * self.cell_width), int((y ) * self.cell_height)])
 
             else:
                 # rect = Rect((x * cell_width, y * cell_height), ((x + 1) * cell_width, (y + 1) * cell_height))
-                pygame.draw.rect(screen, self.color, (x * self.cell_width, y * self.cell_height, self.cell_width, self.cell_height))
+                pygame.draw.circle(screen, self.color,
+                                   [int((x + 0.5) * self.cell_width), int((y + 0.5) * self.cell_height)],
+                                   int(self.cell_width / 2))
             index += 1
 
     def isLegal(self):
@@ -63,38 +75,41 @@ class Snake():
             if s.body[0] == self.body[0]:
                 continue
             for (x, y) in s.body:
-                if (nx, ny) == (x, y):
+                if (nx - x)**2 +(ny - y)**2 < 1:
                     self.killed = 1
                     return True
         return False
 
     def update_direc(self, action):
-        if action == 0 and (self.direction != 'D' or len(self.body) == 1):
+        self.last_move = -1
+        if action == 0:
             #self.snake.up()
-            self.direction = 'U'
+            if self.direction < 270.0:
+                self.direction = self.direction * 0.4 + 90 * 0.6
+            else:
+                self.direction = (self.direction - 360) * 0.4 + 90 * 0.6
         elif action == 1 and (self.direction != 'R' or len(self.body) == 1):
             #self.snake.left()
-            self.direction = 'L'
+            self.direction = self.direction * 0.4 + 180 * 0.6
         elif action == 2 and (self.direction != 'L' or len(self.body) == 1):
             #self.snake.right()
-            self.direction = 'R'
+            if self.direction < 180.0:
+                self.direction = self.direction * 0.4 + 0 * 0.6
+            else:
+                self.direction = self.direction * 0.4 + 360 * 0.6
         elif action == 3 and (self.direction != 'U' or len(self.body) == 1):
             #self.snake.down()
-            self.direction = 'D'
-        else:
-            return False
+            if self.direction > 90.0:
+                self.direction = self.direction * 0.4 + 270 * 0.6
+            else:
+                self.direction = (self.direction + 360) * 0.4 + 270 * 0.6
+
+        self.newhead = pygame.transform.rotate(self.head, self.direction - 90)
         return True
 
     def new_point(self):
         (hx, hy) = self.body[0]
-        if self.direction == 'L':
-            (nx, ny) = (hx - 1, hy)
-        elif self.direction == 'R':
-            (nx, ny) = (hx + 1, hy)
-        elif self.direction == 'U':
-            (nx, ny) = (hx, hy - 1)
-        elif self.direction == 'D':
-            (nx, ny) = (hx, hy + 1)
+        (nx, ny) = (hx + math.cos(math.radians(self.direction)), hy - math.sin(math.radians(self.direction)))
         self.nx = nx
         self.ny = ny
 
@@ -103,21 +118,32 @@ class Snake():
         ny = self.ny
 
         self.body.insert(0, (nx, ny))
-        if field_map[ny][nx] == 1:
-            # eat food
-            self.color_degree += 5
-            if self.color_degree > 255:
-                self.color_degree = 255
-            # self.color = pygame.Color(0, self.color_degree, 0)
+        for i in range(-1, 2):
+            for j in range(-1, 2):
+                x = int(nx*food_dim)+i
+                y = int(ny*food_dim)+j
+                x = min(x, field_width*food_dim-1)
+                x = max(x, 0)
+                y = min(y, field_height * food_dim - 1)
+                y = max(y, 0)
+                if field_map[y][x] == 1:
+                    # eat food
+                    self.color_degree += 5
+                    if self.color_degree > 255:
+                        self.color_degree = 255
+                    # self.color = pygame.Color(0, self.color_degree, 0)
 
-            field_map[ny][nx] = 0
-            index = 0
-            for (fx, fy, _) in foods:
-                if (fx, fy) == (nx, ny):
-                    foods.pop(index)
-                    break
-                index += 1
-        elif len(self.body) > 5:
+                    field_map[y][x] = 0
+                    index = 0
+                    for (fx, fy, _) in foods:
+                        if (fx, fy) == (x, y):
+                            foods.pop(index)
+                            break
+                        index += 1
+                    self.eat_count += 1
+        if self.eat_count > 0:
+            self.eat_count -= 1
+        else:
             self.body.pop()
 
         self.draw(screen)
@@ -127,16 +153,16 @@ class Snake():
             pygame.Color(255, 0, 0), pygame.Color(0, 0, 255),
             pygame.Color(100, 100, 100), pygame.Color(100, 0, 200))
         for (x, y) in self.body:
-            field_map[y][x] = 1
-            foods.append((x, y, colors_for_foods[random.randint(0, len(colors_for_foods) - 1)]))
+            field_map[int(y*food_dim)][int(x*food_dim)] = 1
+            foods.append((int(x*food_dim), int(y*food_dim), colors_for_foods[random.randint(0, len(colors_for_foods) - 1)]))
 
 def drawFoods():
     for (x, y, color) in foods:
-        pygame.draw.circle(screen, color, [int((x + 0.5) * cell_width), int((y + 0.5) * cell_height)], int(cell_width / 4))
+        pygame.draw.circle(screen, color, [int((x/food_dim + 0.5) * cell_width), int((y/food_dim + 0.5) * cell_height)], int(cell_width / 4))
 
 def produceFood():
     while True:
-        nfx, nfy = random.randint(0, field_width - 1), random.randint(0, field_height - 1)
+        nfx, nfy = random.randint(0, field_width*food_dim - 1), random.randint(0, field_height*food_dim - 1)
         if (nfx, nfy) in snake.body:
             continue
         if field_map[nfy][nfx] == 1:
@@ -162,7 +188,8 @@ game_over = False
 foods = []
 last_food_produce = -1
 food_produce_interval = 4000
-field_map = [[0 for i in range(field_width)] for j in range(field_height)]
+food_dim = 3
+field_map = [[0 for i in range(field_width*food_dim)] for j in range(field_height*food_dim)]
 
 snake = Snake()
 enemy = []
