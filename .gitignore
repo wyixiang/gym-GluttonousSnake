@@ -3,8 +3,6 @@ examples/__pycache__/
 
 *.pyc
 
-gym_GluttonousSnake/envs/define\.py
-
 gym_GluttonousSnake/envs/game\.py
 
 \.idea/
