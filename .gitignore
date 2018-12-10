@@ -10,3 +10,5 @@ gym_GluttonousSnake/envs/game\.py
 \.idea/
 
 game/test\.py
+
+examples/tmp/log-cnn/

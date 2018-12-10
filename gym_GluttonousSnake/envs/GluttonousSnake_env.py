@@ -8,7 +8,7 @@ class GluttonousSnakeEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
     def __init__(self):
-        self.field_width, self.field_height = 30, 30
+        self.field_width, self.field_height = 15, 15
         self.cell_width, self.cell_height = 20, 20
         self.max_step = 2000
         self.food_produce_interval = 15
@@ -31,9 +31,9 @@ class GluttonousSnakeEnv(gym.Env):
         self.screen.fill((255, 255, 255))
         self.now_step += 1
         t = self.now_step
-        if self.last_food_produce == -1 or t - self.last_food_produce >= self.food_produce_interval:
+        '''if self.last_food_produce == -1 or t - self.last_food_produce >= self.food_produce_interval:
             self.produceFood()
-            self.last_food_produce = t
+            self.last_food_produce = t'''
 
         self.drawFoods()
         self.snake.update(self.screen, self.foods, self.field_map)
@@ -41,19 +41,26 @@ class GluttonousSnakeEnv(gym.Env):
 
         pygame.display.flip()
         pygame.display.update()
-        image_data = pygame.surfarray.array3d(pygame.display.get_surface())
+        image_data = pygame.display.get_surface()
 
         if not done:
-            reward = self.snake.get_lenth() - self.last_lenth
-            if reward > 0:
-                self.last_lenth = self.snake.get_lenth()
+            if self.snake.eat - self.last_eat > 0:
+                reward = 10
+                self.last_eat = self.snake.eat
+                self.produceFood()
+            else:
+                reward = -0.2
         else:
-            reward = -100
+            reward = -20
 
         if self.now_step == self.max_step - 1:
             done = True
 
-        state = image_data
+        #state = image_data
+        #image_data = pygame.transform.flip(pygame.display.get_surface(), True, True)
+        image_data = pygame.transform.rotate(image_data, 90.0)
+        image_data = pygame.transform.flip(image_data, False, True)
+        state = pygame.surfarray.array3d(image_data)
 
         return state, reward, done, {}
 
@@ -66,21 +73,24 @@ class GluttonousSnakeEnv(gym.Env):
         self.last_food_produce = -1
         self.field_map = [[0 for i in range(self.field_width)] for j in range(self.field_height)]
         self.snake = Snake()
-        self.last_lenth = 1
+        self.last_eat = 0
 
         self.now_step = 0
 
         self.screen.fill((255, 255, 255))
         self.snake.draw(self.screen)
-        for i in range(2):
+        for i in range(1):
             self.produceFood()
 
         self.drawFoods()
 
         pygame.display.flip()
         pygame.display.update()
-        image_data = pygame.surfarray.array3d(pygame.display.get_surface())
-        state = image_data
+        image_data = pygame.display.get_surface()
+        image_data = pygame.transform.rotate(image_data, 90.0)
+        image_data = pygame.transform.flip(image_data, False, True)
+        state = pygame.surfarray.array3d(image_data)
+
 
         return state
 
@@ -113,7 +123,7 @@ class GluttonousSnakeEnv(gym.Env):
 
 class Snake():
     def __init__(self, is_enemy=False):
-        self.field_width, self.field_height = 30, 30
+        self.field_width, self.field_height = 15, 15
         self.cell_width, self.cell_height = 20, 20
         self.direction = 'D'
         self.color_degree = 0
@@ -121,8 +131,10 @@ class Snake():
         self.color = pygame.Color(0, self.color_degree, 0)
         self.speed = 300
         self.last_move = 0
-        self.body = [(10, 10)]
+        self.body = [(3, 3)]
         self.game_over = False
+        self.init_lenth = 5
+        self.eat = 0
         if is_enemy:
             self.position = random.randrange(300, 1300), random.randrange(200, 600)
         else:
@@ -162,19 +174,23 @@ class Snake():
         return True
 
     def left(self):
-        self.direction = 'L'
+        if self.direction != 'R':
+            self.direction = 'L'
         self.last_move = -1
 
     def right(self):
-        self.direction = 'R'
+        if self.direction != 'L':
+            self.direction = 'R'
         self.last_move = -1
 
     def down(self):
-        self.direction = 'D'
+        if self.direction != 'U':
+            self.direction = 'D'
         self.last_move = -1
 
     def up(self):
-        self.direction = 'U'
+        if self.direction != 'D':
+            self.direction = 'U'
         self.last_move = -1
 
     def update(self, screen, foods, field_map):
@@ -207,9 +223,10 @@ class Snake():
             for (fx, fy, _) in foods:
                 if (fx, fy) == (nx, ny):
                     foods.pop(index)
+                    self.eat += 1
                     break
                 index += 1
-        elif len(self.body) > 2:
+        elif len(self.body) > self.init_lenth:
             self.body.pop()
         self.last_move = 0
         self.draw(screen)

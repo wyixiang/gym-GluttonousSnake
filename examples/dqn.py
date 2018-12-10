@@ -18,6 +18,9 @@ import liveplot
 import tensorflow as tf
 from keras.backend.tensorflow_backend import set_session
 from keras.callbacks import TensorBoard
+import cv2
+import warnings
+import matplotlib.pyplot as plt
 
 class DeepQ:
     """
@@ -44,32 +47,31 @@ class DeepQ:
         self.discountFactor = discountFactor
         self.learnStart = learnStart
         self.learningRate = learningRate
-        #self.TAU = 0.001
+        self.TAU = 0.001
         config = tf.ConfigProto()
         config.gpu_options.allow_growth = True
         set_session(tf.Session(config=config))
 
     def initNetworks(self):
-        model = self.createModel()
-        self.model = model
-
-        #targetModel = self.createModel()
-        #self.targetModel = targetModel
+        self.model = self.createModel()
+        #self.targetModel = self.createModel()
 
     def createModel(self):
         model = Sequential()
-        model.add(Conv2D(16, (3, 3), strides=(2,2), input_shape=(img_rows,img_cols,img_channels)))
+        model.add(Conv2D(32, (8, 8), strides=(4,4), input_shape=(img_rows,img_cols,img_channels)))
         model.add(Activation('relu'))
-        model.add(ZeroPadding2D((1, 1)))
-        model.add(Conv2D(16, (3, 3), strides=(2,2)))
+        # model.add(ZeroPadding2D((1, 1)))
+        model.add(Conv2D(64, (4, 4), strides=(2,2)))
         model.add(Activation('relu'))
-        model.add(MaxPooling2D(pool_size=(2, 2), strides=(2,2)))
+        model.add(Conv2D(64, (3, 3), strides=(1, 1)))
+        model.add(Activation('relu'))
+        #model.add(MaxPooling2D(pool_size=(2, 2), strides=(2,2)))
         model.add(Flatten())
-        model.add(Dense(256))
+        model.add(Dense(512))
         model.add(Activation('relu'))
         model.add(Dense(self.output_size))
         #model.compile(RMSprop(lr=self.learningRate), 'MSE')
-        optimizer = optimizers.RMSprop(lr=self.learningRate, rho=0.9, epsilon=1e-06)
+        optimizer = optimizers.RMSprop(lr=self.learningRate, rho=0.99, epsilon=1e-06)
         model.compile(loss="mse", optimizer=optimizer)
         model.summary()
 
@@ -199,8 +201,10 @@ class DeepQ:
                 Y_batch = np.append(Y_batch, np.array([Y_sample]), axis=0)
                 if isFinal:
                     X_batch = np.append(X_batch, newState.copy(), axis=0)
-                    Y_batch = np.append(Y_batch, np.array([[reward]*self.output_size]), axis=0)
-            self.model.fit(X_batch, Y_batch, validation_split=0.2, batch_size = len(miniBatch), epochs=1, verbose = 0, callbacks=[TensorBoard(log_dir='./tmp/log-cnn')])
+                    Y_batch = np.append(Y_batch, np.array([[reward] * self.output_size]), axis=0)
+
+            self.model.fit(X_batch, Y_batch, validation_split=0.2, batch_size=len(miniBatch), epochs=1, verbose = 0, callbacks=[TensorBoard(log_dir='./tmp/log-cnn')])
+
 
     def saveModel(self, path):
         self.model.save(path+'.h5')
@@ -222,43 +226,58 @@ def clear_monitor_files(training_dir):
         os.unlink(file)
 
 
+def get_format_state(observation):
+    #print('ob size:',observation.shape)
+    #print('观察:',observation)
+    cv_image = cv2.cvtColor(observation, cv2.COLOR_BGR2GRAY)
+    #print('cv shape:',cv_image.shape)
+    #print('cv_image:',cv_image)
+    #plt.imsave(pic_path+'cv_image.jpg',cv_image)
+    cv_image = cv2.resize(cv_image, (img_rows, img_cols))
+    state = cv_image.reshape(1, img_rows, img_cols, 1)
+    cv2.namedWindow("Image window", cv2.WINDOW_NORMAL)
+    cv2.resizeWindow("Image window", 300, 300)
+    cv2.imshow("Image window", cv_image)
+    cv2.waitKey(3)
+    return state
+
+
+img_rows, img_cols, img_channels = 60, 60, 1
+
+
 if __name__ == '__main__':
+    warnings.filterwarnings("ignore")
 
     env_o = gym.make('Glu-v0')
     outdir = '/tmp/GluttonousSnake_gym_experiments/'
 
     continue_execution = False
 
-    weights_path = './tmp/cnn/GluttonousSnake'
-    monitor_path = './tmp/GluttonousSnake'
-    params_json = './tmp//GluttonousSnake.json'
+    weights_path = './tmp/dqn/wights'
+    monitor_path = './tmp/dqn/monitors'
+    params_json = './tmp/dqn/GluttonousSnake.json'
+    pic_path = './tmp/dqn/'
     plotter = liveplot.LivePlot(outdir)
 
-    img_rows, img_cols, img_channels = env_o.img_rows, env_o.img_cols, env_o.img_channels
-
-    epsilon_discount = 0.999
+    epsilon_discount = 0.998
 
     if not continue_execution:
         episode_count = 10000
-        max_steps = 1000
+        max_steps = 2000
         updateTargetNetwork = 10000
         minibatch_size = 64
-        learningRate = 0.00025#1e-3
+        learningRate = 1e-3
         discountFactor = 0.99
         memorySize = 10000
         learnStart = 500
         network_outputs = 4
-        EXPLORE = 1500
-        INITIAL_EPSILON = 0.4  # starting value of epsilon
+        EXPLORE = 10000
+        INITIAL_EPSILON = 1  # starting value of epsilon
         FINAL_EPSILON = 0.1  # final value of epsilon
         explorationRate = INITIAL_EPSILON
         current_epoch = 0
         stepCounter = 0
         loadsim_seconds = 0
-
-        agent = DeepQ(network_outputs, memorySize, discountFactor, learningRate, learnStart)
-        agent.initNetworks()
-        #agent.loadWeights('./tmp/cbak/turtle_camera2500')
 
     else:
         #Load weights, monitor info and parameter info.
@@ -281,15 +300,20 @@ if __name__ == '__main__':
             loadsim_seconds = d.get('loadsim_seconds')
             EXPLORE = d.get('EXPLORE')
 
+    env = gym.wrappers.Monitor(env_o, outdir,force=not continue_execution, resume=continue_execution)
+
+
+
+    if not continue_execution:
+        agent = DeepQ(network_outputs, memorySize, discountFactor, learningRate, learnStart)
+        agent.initNetworks()
+    else:
         agent = DeepQ(network_outputs, memorySize, discountFactor, learningRate, learnStart)
         agent.initNetworks()
         agent.loadWeights(weights_path)
-
         clear_monitor_files(outdir)
         copy_tree(monitor_path, outdir)
 
-    #env_o.get_init(action_dim=network_outputs, max_step=max_steps)
-    env = gym.wrappers.Monitor(env_o, outdir,force=not continue_execution, resume=continue_execution)
 
     last100Scores = [0] * 100
     last100ScoresIndex = 0
@@ -302,20 +326,16 @@ if __name__ == '__main__':
     #start iterating from 'current epoch'.
     for epoch in range(current_epoch+1, episode_count + 1, 1):
         observation = env.reset()
-        state = observation
+        state = get_format_state(observation)
+
         cumulated_reward = 0
 
         for t in range(max_steps):
-            env_o.get_step(t)
-            #time.sleep(1)
-
-            #action = agent.selectAction(state, explorationRate)
-            action = random.randint(0, 3)
-            #action = agent.selectAction(qValues, explorationRate * (t + 10) / (10 + step_average))
+            action = agent.selectAction(state, explorationRate)
+            # action = agent.selectAction(state, explorationRate * (t + 10) / (10 + step_average))  # 随着训练的进行，explorationRate
 
             newObservation, reward, done, info = env.step(action)
-            newstate = newObservation
-
+            newstate = get_format_state(newObservation)
             cumulated_reward += reward
             if highest_reward < cumulated_reward:
                 highest_reward = cumulated_reward
@@ -328,8 +348,8 @@ if __name__ == '__main__':
             if stepCounter == learnStart:
                 print("Starting learning")
 
-            #if stepCounter >= learnStart:
-                #agent.learnOnMiniBatch(minibatch_size, False)
+            if stepCounter >= learnStart:
+                agent.learnOnMiniBatch(minibatch_size, False)
                 '''
                 if stepCounter <= updateTargetNetwork:
                     deepQ.learnOnMiniBatch(minibatch_size, False)
@@ -338,7 +358,7 @@ if __name__ == '__main__':
                 '''
 
             if (t == max_steps-1):
-                print ("reached the end")
+                print("reached the end")
                 done = True
 
             if done:
@@ -355,7 +375,9 @@ if __name__ == '__main__':
                     print ("EP "+"%3d"%epoch +" -{:>4} steps".format(t+1)+" - CReward: "+"%5d"%cumulated_reward +"  Eps="+"%3.2f"%explorationRate +"  Time: %d:%02d:%02d" % (h, m, s))
                 else:
                     print ("EP " + str(epoch) +" -{:>4} steps".format(t+1) +" - last100 C_Rewards : " + str(int((sum(last100Scores) / len(last100Scores)))) + " - CReward: " + "%5d" % cumulated_reward + "  Eps=" + "%3.2f" % explorationRate + "  Time: %d:%02d:%02d" % (h, m, s))
-                    if (epoch)%100==0:
+
+
+                    if epoch > 500 and (epoch)%50==0:
                         agent.saveModel(weights_path+str(epoch))
                         env._flush(force=True)
                         copy_tree(outdir,monitor_path)
@@ -365,13 +387,10 @@ if __name__ == '__main__':
                         parameter_dictionary = dict(zip(parameter_keys, parameter_values))
                         with open(params_json, 'w') as outfile:
                             json.dump(parameter_dictionary, outfile)
+
+
                 break
 
-            '''
-            if stepCounter % updateTargetNetwork == 0:
-                deepQ.updateTargetNetwork()
-                print ("updating target network")
-            '''
         if epoch%10==0:
             plotter.plot(env,average=10)
 
@@ -379,5 +398,6 @@ if __name__ == '__main__':
             #explorationRate -= (INITIAL_EPSILON - FINAL_EPSILON) / EXPLORE
             explorationRate *= epsilon_discount
 
-    env.close()
 
+
+    env.close()
