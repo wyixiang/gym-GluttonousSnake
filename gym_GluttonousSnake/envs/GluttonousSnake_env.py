@@ -2,18 +2,23 @@ import gym
 
 import pygame
 import random
+import collections
+import numpy as np
 
 
 class GluttonousSnakeEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
     def __init__(self):
-        self.field_width, self.field_height = 15, 15
+        self.field_width, self.field_height = 10, 10
         self.cell_width, self.cell_height = 20, 20
         self.max_step = 2000
         self.food_produce_interval = 15
         self.last_food_produce = -1
         self.now_step = 0
+        self.num_last_frames = 4
+        self.frames = None
+        self.total_reward = 0
         self.colors_for_foods = (
             pygame.Color(255, 0, 0), pygame.Color(0, 0, 255),
             pygame.Color(100, 100, 100), pygame.Color(100, 0, 200))
@@ -30,8 +35,8 @@ class GluttonousSnakeEnv(gym.Env):
 
         self.screen.fill((255, 255, 255))
         self.now_step += 1
-        t = self.now_step
-        '''if self.last_food_produce == -1 or t - self.last_food_produce >= self.food_produce_interval:
+        '''t = self.now_step
+        if self.last_food_produce == -1 or t - self.last_food_produce >= self.food_produce_interval:
             self.produceFood()
             self.last_food_produce = t'''
 
@@ -39,30 +44,24 @@ class GluttonousSnakeEnv(gym.Env):
         self.snake.update(self.screen, self.foods, self.field_map)
         done = self.snake.game_over
 
-        pygame.display.flip()
-        pygame.display.update()
-        image_data = pygame.display.get_surface()
+        observation = self.get_observation()
+        state = observation
 
         if not done:
             if self.snake.eat - self.last_eat > 0:
-                reward = 10
+                reward = 5
+                self.total_reward += 1
                 self.last_eat = self.snake.eat
                 self.produceFood()
             else:
-                reward = -0.2
+                reward = -0.1
         else:
-            reward = -20
+            reward = -1
 
         if self.now_step == self.max_step - 1:
             done = True
 
-        #state = image_data
-        #image_data = pygame.transform.flip(pygame.display.get_surface(), True, True)
-        image_data = pygame.transform.rotate(image_data, 90.0)
-        image_data = pygame.transform.flip(image_data, False, True)
-        state = pygame.surfarray.array3d(image_data)
-
-        return state, reward, done, {}
+        return state, reward, done, self.total_reward
 
     def reset(self):
         pygame.init()
@@ -74,23 +73,17 @@ class GluttonousSnakeEnv(gym.Env):
         self.field_map = [[0 for i in range(self.field_width)] for j in range(self.field_height)]
         self.snake = Snake()
         self.last_eat = 0
+        self.total_reward = 0
 
         self.now_step = 0
 
         self.screen.fill((255, 255, 255))
         self.snake.draw(self.screen)
-        for i in range(1):
-            self.produceFood()
+        self.produceFood()
 
         self.drawFoods()
-
-        pygame.display.flip()
-        pygame.display.update()
-        image_data = pygame.display.get_surface()
-        image_data = pygame.transform.rotate(image_data, 90.0)
-        image_data = pygame.transform.flip(image_data, False, True)
-        state = pygame.surfarray.array3d(image_data)
-
+        observation = self.get_observation()
+        state = observation
 
         return state
 
@@ -111,6 +104,24 @@ class GluttonousSnakeEnv(gym.Env):
             self.foods.append((nfx, nfy, self.colors_for_foods[random.randint(0, len(self.colors_for_foods) - 1)]))
             break
 
+    def get_last_frames(self, observation):
+        frame = observation
+        if self.frames is None:
+            self.frames = collections.deque([frame] * self.num_last_frames)
+        else:
+            self.frames.append(frame)
+            self.frames.popleft()
+        return np.expand_dims(self.frames, 0)
+
+    def get_observation(self):
+        pygame.display.flip()
+        pygame.display.update()
+        image_data = pygame.display.get_surface()
+        image_data = pygame.transform.rotate(image_data, 90.0)
+        image_data = pygame.transform.flip(image_data, False, True)
+        observation = pygame.surfarray.array3d(image_data)
+        return observation
+
     def render(self, mode="human", close=False):
         if close:
             self.close()
@@ -123,7 +134,7 @@ class GluttonousSnakeEnv(gym.Env):
 
 class Snake():
     def __init__(self, is_enemy=False):
-        self.field_width, self.field_height = 15, 15
+        self.field_width, self.field_height = 10, 10
         self.cell_width, self.cell_height = 20, 20
         self.direction = 'D'
         self.color_degree = 0

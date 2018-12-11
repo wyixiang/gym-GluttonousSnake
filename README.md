@@ -41,6 +41,13 @@ python3 multi2_rand.py
 
 ## 更新日志
 
+### 20181211
+1.修改Glu-v0界面尺寸及reward  
+2.修改Glu-v0相应的DQN为连续四帧  
+3.修改plot函数，同时打印reward和score  
+4.修改DQN中keras为channel_first    
+5.修改DQN部分参数 
+
 ### 20181210
 1.修改Glu-v0界面尺寸及reward  
 2.修改Glu-v0食物生成逻辑，改为任意时间仅一枚食物  

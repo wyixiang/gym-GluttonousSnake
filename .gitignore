@@ -10,3 +10,9 @@ gym_GluttonousSnake/envs/game\.py
 game/test\.py
 
 examples/tmp/log-cnn/
+
+*.h5
+
+examples/tmp/dqn/GluttonousSnake\.json
+
+*.json

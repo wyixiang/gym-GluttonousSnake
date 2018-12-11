@@ -21,6 +21,7 @@ from keras.callbacks import TensorBoard
 import cv2
 import warnings
 import matplotlib.pyplot as plt
+import collections
 
 class DeepQ:
     """
@@ -58,7 +59,7 @@ class DeepQ:
 
     def createModel(self):
         model = Sequential()
-        model.add(Conv2D(32, (8, 8), strides=(4,4), input_shape=(img_rows,img_cols,img_channels)))
+        model.add(Conv2D(32, (8, 8), strides=(4,4), input_shape=(img_channels,img_rows,img_cols)))
         model.add(Activation('relu'))
         # model.add(ZeroPadding2D((1, 1)))
         model.add(Conv2D(64, (4, 4), strides=(2,2)))
@@ -103,7 +104,6 @@ class DeepQ:
         for i in range(len(weights)):
             target_weights[i] = self.TAU * weights[i] + (1 - self.TAU) * target_weights[i]
         self.targetModel.set_weights(target_weights)
-        #self.backupNetwork(self.model, self.targetModel)
 
     # predict Q values for all the actions
     def getQValues(self, state):
@@ -178,7 +178,7 @@ class DeepQ:
         if self.memory.getCurrentSize() > self.learnStart:
             # learn in batches of 128
             miniBatch = self.memory.getMiniBatch(miniBatchSize)
-            X_batch = np.empty((0,img_rows,img_cols,img_channels), dtype = np.float64)
+            X_batch = np.empty((0,img_channels,img_rows,img_cols), dtype = np.float64)
             Y_batch = np.empty((0,self.output_size), dtype = np.float64)
             for sample in miniBatch:
                 isFinal = sample['isFinal']
@@ -190,7 +190,7 @@ class DeepQ:
                 qValues = self.getQValues(state)
                 if useTargetNetwork:
                     qValuesNewState = self.getTargetQValues(newState)
-                    #self.updateTargetNetwork()
+                    self.updateTargetNetwork()
                 else :
                     qValuesNewState = self.getQValues(newState)
                 targetValue = self.calculateTarget(qValuesNewState, reward, isFinal)
@@ -203,7 +203,7 @@ class DeepQ:
                     X_batch = np.append(X_batch, newState.copy(), axis=0)
                     Y_batch = np.append(Y_batch, np.array([[reward] * self.output_size]), axis=0)
 
-            self.model.fit(X_batch, Y_batch, validation_split=0.2, batch_size=len(miniBatch), epochs=1, verbose = 0, callbacks=[TensorBoard(log_dir='./tmp/log-cnn')])
+            self.model.fit(X_batch, Y_batch, validation_split=0.2, batch_size=len(miniBatch), epochs=1, verbose = 0)
 
 
     def saveModel(self, path):
@@ -227,22 +227,27 @@ def clear_monitor_files(training_dir):
 
 
 def get_format_state(observation):
-    #print('ob size:',observation.shape)
-    #print('观察:',observation)
     cv_image = cv2.cvtColor(observation, cv2.COLOR_BGR2GRAY)
-    #print('cv shape:',cv_image.shape)
-    #print('cv_image:',cv_image)
-    #plt.imsave(pic_path+'cv_image.jpg',cv_image)
     cv_image = cv2.resize(cv_image, (img_rows, img_cols))
-    state = cv_image.reshape(1, img_rows, img_cols, 1)
     cv2.namedWindow("Image window", cv2.WINDOW_NORMAL)
     cv2.resizeWindow("Image window", 300, 300)
     cv2.imshow("Image window", cv_image)
     cv2.waitKey(3)
-    return state
+    return cv_image
+
+def get_last_frames(frames, observation):
+    frame = observation
+    if frames is None:
+        frames = collections.deque([frame] * 4)
+    else:
+        frames.append(frame)
+        frames.popleft()
+    a = np.expand_dims(frames, 0)
+    #print(a.shape)
+    return np.expand_dims(frames, 0)
 
 
-img_rows, img_cols, img_channels = 60, 60, 1
+img_rows, img_cols, img_channels = 40, 40, 4
 
 
 if __name__ == '__main__':
@@ -257,12 +262,13 @@ if __name__ == '__main__':
     monitor_path = './tmp/dqn/monitors'
     params_json = './tmp/dqn/GluttonousSnake.json'
     pic_path = './tmp/dqn/'
-    plotter = liveplot.LivePlot(outdir)
+    plotter1 = liveplot.LivePlot(1)
+    plotter2 = liveplot.LivePlot(2)
 
     epsilon_discount = 0.998
 
     if not continue_execution:
-        episode_count = 10000
+        episode_count = 10000000
         max_steps = 2000
         updateTargetNetwork = 10000
         minibatch_size = 64
@@ -271,9 +277,9 @@ if __name__ == '__main__':
         memorySize = 10000
         learnStart = 500
         network_outputs = 4
-        EXPLORE = 10000
+        EXPLORE = 500000
         INITIAL_EPSILON = 1  # starting value of epsilon
-        FINAL_EPSILON = 0.1  # final value of epsilon
+        FINAL_EPSILON = 0.01  # final value of epsilon
         explorationRate = INITIAL_EPSILON
         current_epoch = 0
         stepCounter = 0
@@ -315,27 +321,33 @@ if __name__ == '__main__':
         copy_tree(monitor_path, outdir)
 
 
+    last100Rewards = [0] * 100
     last100Scores = [0] * 100
-    last100ScoresIndex = 0
+    last100Index = 0
     last100Filled = False
     highest_reward = 0
+    highest_score = 0
     start_time = time.time()
 
     step_average=0
+    data1 = []
+    data2 = []
 
     #start iterating from 'current epoch'.
     for epoch in range(current_epoch+1, episode_count + 1, 1):
         observation = env.reset()
-        state = get_format_state(observation)
+        observation = get_format_state(observation)
+        frames = None
+        state = get_last_frames(frames, observation)
 
         cumulated_reward = 0
 
         for t in range(max_steps):
             action = agent.selectAction(state, explorationRate)
-            # action = agent.selectAction(state, explorationRate * (t + 10) / (10 + step_average))  # 随着训练的进行，explorationRate
 
-            newObservation, reward, done, info = env.step(action)
-            newstate = get_format_state(newObservation)
+            newObservation, reward, done, total_score = env.step(action)
+            newObservation = get_format_state(newObservation)
+            newstate = get_last_frames(frames, newObservation)
             cumulated_reward += reward
             if highest_reward < cumulated_reward:
                 highest_reward = cumulated_reward
@@ -357,47 +369,40 @@ if __name__ == '__main__':
                     deepQ.learnOnMiniBatch(minibatch_size, True)
                 '''
 
-            if (t == max_steps-1):
-                print("reached the end")
-                done = True
+            if explorationRate > FINAL_EPSILON and stepCounter > learnStart:
+                if explorationRate > 0.1:
+                    explorationRate -= (INITIAL_EPSILON - 0.1) / EXPLORE
+                else:
+                    explorationRate -= (0.1 - FINAL_EPSILON) / EXPLORE
 
             if done:
-                step_average=0.9*step_average+0.1*t
-                last100Scores[last100ScoresIndex] = cumulated_reward
-                last100ScoresIndex += 1
+                last100Rewards[last100Index] = cumulated_reward
+                last100Scores[last100Index] = total_score
+                data1.append(total_score)
+                data2.append(cumulated_reward)
+                last100Index += 1
                 total_seconds = int(time.time() - start_time + loadsim_seconds)
                 m, s = divmod(total_seconds, 60)
                 h, m = divmod(m, 60)
-                if last100ScoresIndex >= 100:
+                if last100Index >= 100:
                     last100Filled = True
-                    last100ScoresIndex = 0
+                    last100Index = 0
                 if not last100Filled:
-                    print ("EP "+"%3d"%epoch +" -{:>4} steps".format(t+1)+" - CReward: "+"%5d"%cumulated_reward +"  Eps="+"%3.2f"%explorationRate +"  Time: %d:%02d:%02d" % (h, m, s))
+                    print("EP "+"%3d"%epoch +" -{:>4} steps".format(t+1)+" - CReward: "+"%5d"%cumulated_reward+" - Score: "+"%3d"%total_score +"  Eps="+"%3.2f"%explorationRate +"  Time: %d:%02d:%02d" % (h, m, s))
                 else:
-                    print ("EP " + str(epoch) +" -{:>4} steps".format(t+1) +" - last100 C_Rewards : " + str(int((sum(last100Scores) / len(last100Scores)))) + " - CReward: " + "%5d" % cumulated_reward + "  Eps=" + "%3.2f" % explorationRate + "  Time: %d:%02d:%02d" % (h, m, s))
+                    print("EP " + str(epoch) +" -{:>4} steps".format(t+1) +" - last100 C_Rewards : " + str(int((sum(last100Rewards) / len(last100Rewards)))) + " - CReward: " + "%5d" % cumulated_reward +" - last100 Scores : " + str(int((sum(last100Scores) / len(last100Scores)))) + " - Score: " + "%5d" % total_score + "  Eps=" + "%3.2f" % explorationRate + "  Time: %d:%02d:%02d" % (h, m, s))
 
-
-                    if epoch > 500 and (epoch)%50==0:
+                    if epoch >= 500 and (epoch)%50==0:
                         agent.saveModel(weights_path+str(epoch))
-                        env._flush(force=True)
-                        copy_tree(outdir,monitor_path)
-                        #save simulation parameters.
                         parameter_keys = ['epochs','steps','updateTargetNetwork','explorationRate','minibatch_size','learnStart','learningRate','discountFactor','memorySize','network_outputs','current_epoch','stepCounter','EXPLORE','INITIAL_EPSILON','FINAL_EPSILON','loadsim_seconds']
                         parameter_values = [episode_count, max_steps, updateTargetNetwork, explorationRate, minibatch_size, learnStart, learningRate, discountFactor, memorySize, network_outputs, epoch, stepCounter, EXPLORE, INITIAL_EPSILON, FINAL_EPSILON, total_seconds]
                         parameter_dictionary = dict(zip(parameter_keys, parameter_values))
                         with open(params_json, 'w') as outfile:
                             json.dump(parameter_dictionary, outfile)
-
-
                 break
 
-        if epoch%10==0:
-            plotter.plot(env,average=10)
-
-        if explorationRate > FINAL_EPSILON and stepCounter > learnStart:
-            #explorationRate -= (INITIAL_EPSILON - FINAL_EPSILON) / EXPLORE
-            explorationRate *= epsilon_discount
-
-
+        if epoch % 10 == 0:
+            plotter1.plot(data1, average=10)
+            plotter2.plot(data2, average=10)
 
     env.close()

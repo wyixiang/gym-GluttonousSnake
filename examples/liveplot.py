@@ -8,8 +8,11 @@ from scipy.interpolate import pchip
 
 rewards_key = 'episode_rewards'
 
+matplotlib.rcParams['toolbar'] = 'None'
+plt.style.use('ggplot')
+
 class LivePlot(object):
-    def __init__(self, outdir, data_key=rewards_key, line_color='blue'):
+    def __init__(self, id, data_key=rewards_key, line_color='blue'):
         """
         Liveplot renders a graph of either episode_rewards or episode_lengths
         Args:
@@ -17,24 +20,21 @@ class LivePlot(object):
             data_key (Optional[str]): The key in the json to graph (episode_rewards or episode_lengths).
             line_color (Optional[dict]): Color of the plot.
         """
-        self.outdir = outdir
+        self.id = id
         self.data_key = data_key
         self.line_color = line_color
 
         #styling options
-        matplotlib.rcParams['toolbar'] = 'None'
-        plt.style.use('ggplot')
+
+        plt.figure(self.id)
         plt.xlabel("Episodes")
         plt.ylabel(data_key)
         fig = plt.gcf().canvas.set_window_title('simulation_graph')
 
-    def plot(self, env, full=True, dots=False, average=0, interpolated=0):
-        if self.data_key is rewards_key:
-            data = gym.wrappers.Monitor.get_episode_rewards(env)
-        else:
-            data = gym.wrappers.Monitor.get_episode_lengths(env)
+    def plot(self, data, full=True, dots=False, average=0, interpolated=0):
 
         avg_data = []
+        plt.figure(self.id)
         plt.clf()
         if full:
             plt.plot(data, color=self.line_color)
