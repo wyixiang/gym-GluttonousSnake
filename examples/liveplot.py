@@ -48,7 +48,7 @@ class LivePlot(object):
                         avg = sum(data[i:i+average])/average
                         avg_data.append(avg)
             new_data = self.expand(avg_data,average)
-            plt.plot(new_data, color='red', linewidth=2.5)
+            plt.plot(new_data, color='red', linewidth=1.5)
         if interpolated > 0:
             avg_data = []
             avg_data_points = []

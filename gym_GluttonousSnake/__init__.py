@@ -12,3 +12,7 @@ register(
     id='Glu-v2',
     entry_point='gym_GluttonousSnake.envs:MultiGluttonousSnake2Env',
 )
+register(
+    id='Glu-v3',
+    entry_point='gym_GluttonousSnake.envs:GluttonousSnake2Env',
+)

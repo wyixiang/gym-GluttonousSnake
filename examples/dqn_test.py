@@ -21,7 +21,6 @@ import warnings
 import matplotlib.pyplot as plt
 import collections
 
-
 class DeepQ:
     def __init__(self, outputs, memorySize, discountFactor, learningRate):
         self.output_size = outputs
@@ -134,102 +133,57 @@ if __name__ == '__main__':
     continue_execution = False
 
     weights_path = './tmp/dqn2/wights'
-    plotter1 = liveplot.LivePlot(1)
-    plotter2 = liveplot.LivePlot(2)
-    plotter3 = liveplot.LivePlot(3, line_color='red')
 
-    episode_count = 10000000
+    episode_count = 10
     max_steps = 2000
-    minibatch_size = 64
     learningRate = 0.001
     discountFactor = 0.95
     memorySize = 50000
-    learnStart = 500
     network_outputs = 3
-    EXPLORE = 200000
-    INITIAL_EPSILON = 1  # starting value of epsilon
-    FINAL_EPSILON = 0.1  # final value of epsilon
-    explorationRate = INITIAL_EPSILON
-    current_epoch = 0
     stepCounter = 0
     loadsim_seconds = 0
 
     agent = DeepQ(network_outputs, memorySize, discountFactor, learningRate)
 
-    last100Rewards = [0] * 100
-    last100Scores = [0] * 100
-    last100Index = 0
-    last100Filled = False
     highest_reward = 0
     highest_score = 0
     start_time = time.time()
 
     total_step = 0
-    data1 = []
-    data2 = []
-    data3 = []
 
     #start iterating from 'current epoch'.
-    for epoch in range(current_epoch+1, episode_count + 1, 1):
-        observation = env.reset()
-        observation = get_format_state(observation)
-        frames = None
-        state, frames = get_last_frames(frames, observation)
+    while True:
+        i = 2000
+        print('\n'+"EP "+"%3d"%i+' test\n')
+        agent.load(weights_path+str(i))
+        i += 50
+        for epoch in range(episode_count):
+            observation = env.reset()
+            observation = get_format_state(observation)
+            frames = None
+            state, frames = get_last_frames(frames, observation)
 
-        cumulated_reward = 0
+            cumulated_reward = 0
 
-        for t in range(max_steps):
-            total_step += 1
-            action, qValues = agent.selectAction(state, explorationRate)
-            data3.append(qValues)
-            #print(state)
+            for t in range(max_steps):
+                total_step += 1
+                action, qValues = agent.selectAction(state, 0)
 
-            newObservation, reward, done, total_score = env.step(action)
-            #print(reward)
-            newObservation = get_format_state(newObservation)
-            newstate, frames = get_last_frames(frames, newObservation)
-            cumulated_reward += reward
-            if highest_reward < cumulated_reward:
-                highest_reward = cumulated_reward
+                newObservation, reward, done, total_score = env.step(action)
+                newObservation = get_format_state(newObservation)
+                newstate, frames = get_last_frames(frames, newObservation)
+                cumulated_reward += reward
+                if highest_reward < cumulated_reward:
+                    highest_reward = cumulated_reward
 
-            agent.addMemory(state, action, reward, newstate, done)
-            state = newstate
+                state = newstate
 
-            stepCounter += 1
+                if done:
+                    total_seconds = int(time.time() - start_time + loadsim_seconds)
+                    m, s = divmod(total_seconds, 60)
+                    h, m = divmod(m, 60)
+                    print("EP "+"%3d"%epoch +" -{:>4} steps".format(t+1) + " - total step:" + "%4d"%total_step +" - CReward: "+"%3d"%cumulated_reward+" - Score: "+"%3d"%total_score +"  Time: %d:%02d:%02d" % (h, m, s))
 
-            if stepCounter == learnStart:
-                print("Starting learning")
-
-            if stepCounter >= learnStart:
-                agent.learnOnMiniBatch(minibatch_size)
-
-            if explorationRate > FINAL_EPSILON and stepCounter > learnStart:
-                explorationRate -= (INITIAL_EPSILON - FINAL_EPSILON) / EXPLORE
-
-            if done:
-                last100Rewards[last100Index] = cumulated_reward
-                last100Scores[last100Index] = total_score
-                data1.append(total_score)
-                data2.append(cumulated_reward)
-                last100Index += 1
-                total_seconds = int(time.time() - start_time + loadsim_seconds)
-                m, s = divmod(total_seconds, 60)
-                h, m = divmod(m, 60)
-                if last100Index >= 100:
-                    last100Filled = True
-                    last100Index = 0
-                if not last100Filled:
-                    print("EP "+"%3d"%epoch +" -{:>4} steps".format(t+1) + " - total step:" + "%4d"%total_step +" - CReward: "+"%3d"%cumulated_reward+" - Score: "+"%3d"%total_score +"  Eps="+"%3.2f"%explorationRate +"  Time: %d:%02d:%02d" % (h, m, s))
-                else:
-                    print("EP " + str(epoch) +" -{:>4} steps".format(t+1) + " - total step:" + "%5d"%total_step +" - last100 C_Rewards : " + "%4.1f" % ((sum(last100Rewards) / len(last100Rewards))) + " - CReward: " + "%5.1f" % cumulated_reward +" - last100 Scores : " + "%4.1f" % ((sum(last100Scores) / len(last100Scores))) + " - Score: " + "%3d" % total_score + "  Eps=" + "%3.2f" % explorationRate + "  Time: %d:%02d:%02d" % (h, m, s))
-
-                    if epoch >= 2000 and (epoch)%50==0:
-                        agent.save(weights_path+str(epoch))
-                break
-
-        if epoch % 10 == 0:
-            plotter1.plot(data1, average=10)
-            plotter2.plot(data2, average=10)
-            plotter3.plot(data3)
+                    break
 
     env.close()

@@ -16,3 +16,5 @@ examples/tmp/log-cnn/
 examples/tmp/dqn/GluttonousSnake\.json
 
 *.json
+
+examples/tmp/dqn2/

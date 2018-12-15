@@ -41,6 +41,13 @@ python3 multi2_rand.py
 
 ## 更新日志
 
+### 20181215
+1.更新Glu-v0  
+2.修改DQN部分参数，并首次训练成功  
+3.新增Glu-v3为Glu-v0的无边框版  
+4.修改Glu-v0为三动作版本  
+5.新增dqn_test  
+
 ### 20181211
 1.修改Glu-v0界面尺寸及reward  
 2.修改Glu-v0相应的DQN为连续四帧  

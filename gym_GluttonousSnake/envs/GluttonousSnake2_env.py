@@ -5,9 +5,9 @@ import random
 import collections
 import numpy as np
 
-field_width, field_height = 10, 10
+field_width, field_height = 5, 5
 
-class GluttonousSnakeEnv(gym.Env):
+class GluttonousSnake2Env(gym.Env):
     metadata = {'render.modes': ['human']}
 
     def __init__(self):
@@ -39,7 +39,7 @@ class GluttonousSnakeEnv(gym.Env):
         self.now_step += 1
 
         self.drawFoods()
-        self.drawEdge()
+        #self.drawEdge()
         self.snake.update(self.screen, self.foods, self.field_map)
         done = self.snake.game_over
 
@@ -48,12 +48,12 @@ class GluttonousSnakeEnv(gym.Env):
 
         if not done:
             if self.snake.eat - self.last_eat > 0:
-                reward = len(self.snake.body)
+                reward = 2
                 self.total_reward += 1
                 self.last_eat = self.snake.eat
                 self.produceFood()
             else:
-                reward = 0
+                reward = -0.1
         else:
             reward = -1
 
@@ -81,7 +81,7 @@ class GluttonousSnakeEnv(gym.Env):
         self.produceFood()
 
         self.drawFoods()
-        self.drawEdge()
+        #self.drawEdge()
         observation = self.get_observation()
         state = observation
 
@@ -93,7 +93,7 @@ class GluttonousSnakeEnv(gym.Env):
                                int(self.cell_width / 4))
 
     def drawEdge(self):
-        color = pygame.Color(50, 50, 50)
+        color = pygame.Color(150, 150, 150)
         for x in range(self.field_width):
             pygame.draw.rect(self.screen, color,
                              (x * self.cell_width, 0 * self.cell_height, self.cell_width, self.cell_height))
@@ -114,7 +114,7 @@ class GluttonousSnakeEnv(gym.Env):
                 continue
 
             self.field_map[nfy][nfx] = 1
-            self.foods.append((nfx, nfy, pygame.Color(200, 200, 200)))
+            self.foods.append((nfx, nfy, pygame.Color(100, 100, 100)))
             break
 
     def get_last_frames(self, observation):
@@ -132,7 +132,6 @@ class GluttonousSnakeEnv(gym.Env):
         image_data = pygame.display.get_surface()
         image_data = pygame.transform.rotate(image_data, 90.0)
         image_data = pygame.transform.flip(image_data, False, True)
-        #image_data = pygame.transform.flip(image_data, True, True)
         observation = pygame.surfarray.array3d(image_data)
         return observation
 
@@ -150,13 +149,13 @@ class Snake():
     def __init__(self, is_enemy=False):
         self.field_width, self.field_height = field_width, field_height
         self.cell_width, self.cell_height = 20, 20
-        self.direction = 'U'
+        self.direction = 'D'
         self.color_degree = 0
         # self.color = random.choice(define.ALL_COLOR)
-        self.color = pygame.Color(100, 100, 100)
+        self.color = pygame.Color(0, 0, 0)
         self.speed = 300
         self.last_move = 0
-        self.body = [(5, 4),(5, 5),(5, 6)]
+        self.body = [(2, 2)]
         self.game_over = False
         self.init_lenth = 3
         self.eat = 0
@@ -178,7 +177,7 @@ class Snake():
         for (x, y) in self.body:
             if index == 0:
                 # head
-                pygame.draw.circle(screen, pygame.Color(150, 150, 150), [int((x + 0.5) * self.cell_width), int((y + 0.5) * self.cell_height)],
+                pygame.draw.circle(screen, pygame.Color(50, 50, 50), [int((x + 0.5) * self.cell_width), int((y + 0.5) * self.cell_height)],
                                    int(self.cell_width / 2))
 
             else:
@@ -187,7 +186,7 @@ class Snake():
             index += 1
 
     def isLegal(self, nx, ny):
-        if nx < 1 or ny < 1 or nx >= self.field_width - 1 or ny >= self.field_height - 1:
+        if nx < 0 or ny < 0 or nx >= self.field_width or ny >= self.field_height:
             return False
         index = 0
         for (x, y) in self.body:
@@ -245,7 +244,6 @@ class Snake():
             (nx, ny) = (hx, hy + 1)
         if not self.isLegal(nx, ny):
             self.game_over = True
-            self.draw(screen)
             return
 
         self.body.insert(0, (nx, ny))
