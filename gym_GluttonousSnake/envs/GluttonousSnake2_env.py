@@ -5,7 +5,7 @@ import random
 import collections
 import numpy as np
 
-field_width, field_height = 5, 5
+field_width, field_height = 9, 9
 
 class GluttonousSnake2Env(gym.Env):
     metadata = {'render.modes': ['human']}
@@ -25,15 +25,14 @@ class GluttonousSnake2Env(gym.Env):
             pygame.Color(100, 100, 100), pygame.Color(100, 0, 200))
 
     def step(self, action):
-        '''if action == 0:
+        if action == 0:
             self.snake.up()
         elif action == 1:
             self.snake.left()
         elif action == 2:
             self.snake.right()
         elif action == 3:
-            self.snake.down()'''
-        self.snake.update_direc(action)
+            self.snake.down()
 
         self.screen.fill((250, 250, 250))
         self.now_step += 1
@@ -155,7 +154,7 @@ class Snake():
         self.color = pygame.Color(0, 0, 0)
         self.speed = 300
         self.last_move = 0
-        self.body = [(2, 2)]
+        self.body = [(4,4)]
         self.game_over = False
         self.init_lenth = 3
         self.eat = 0

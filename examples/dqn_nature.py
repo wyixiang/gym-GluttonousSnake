@@ -32,7 +32,10 @@ class DeepQ:
         config = tf.ConfigProto()
         config.gpu_options.allow_growth = True
         set_session(tf.Session(config=config))
-        self.model = self._build_model()
+        #self.model = self._build_model()
+        self.model = self.createNatureDQN()
+        self.target_model = self.createNatureDQN()
+        self.target_model.set_weights(self.model.get_weights())
 
     def _build_model(self):
         model = Sequential()
@@ -43,18 +46,14 @@ class DeepQ:
             kernel_size=(3, 3),
             strides=(1, 1),
             data_format='channels_first',
-            input_shape=(img_channels, img_rows, img_cols),
-            kernel_initializer=initializers.random_normal(stddev=0.01),
-            bias_initializer=initializers.Constant(value=0.01)
+            input_shape=(img_channels, img_rows, img_cols)
         ))
         model.add(Activation('relu'))
         model.add(Conv2D(
             32,
             kernel_size=(3, 3),
             strides=(1, 1),
-            data_format='channels_first',
-            kernel_initializer=initializers.random_normal(stddev=0.01),
-            bias_initializer=initializers.Constant(value=0.01)
+            data_format='channels_first'
         ))
         model.add(Activation('relu'))
 
@@ -115,13 +114,16 @@ class DeepQ:
             if done:
                 target = reward
             else:
-                target = (reward + self.gamma * np.max(self.model.predict(next_state)[0]))
+                target = (reward + self.gamma * np.max(self.target_model.predict(next_state)[0]))
             qValues = self.model.predict(state)
             Y_sample = qValues[0].copy()
             Y_sample[action] = target
             X_batch = np.append(X_batch, state.copy(), axis=0)
             Y_batch = np.append(Y_batch, np.array([Y_sample]), axis=0)
         self.model.train_on_batch(X_batch, Y_batch)
+
+    def updateTargetNet(self):
+        self.target_model.set_weights(self.model.get_weights())
 
 
     def load(self, name):
@@ -152,7 +154,7 @@ def get_last_frames(frames, observation):
     return np.expand_dims(frames, 0), frames
 
 
-img_rows, img_cols, img_channels = 9, 9, 4
+img_rows, img_cols, img_channels = 84, 84, 4
 
 if __name__ == '__main__':
     warnings.filterwarnings("ignore")
@@ -161,7 +163,7 @@ if __name__ == '__main__':
     env = gym.make('Glu-v3')
     outdir = '/tmp/GluttonousSnake_gym_experiments/'
 
-    weights_path = './tmp/dqn4a2/wights'
+    weights_path = './tmp/dqnnature/wights'
     plotter1 = liveplot.LivePlot(1)
     plotter2 = liveplot.LivePlot(2)
     plotter3 = liveplot.LivePlot(3, line_color='red')
@@ -229,6 +231,9 @@ if __name__ == '__main__':
 
             if stepCounter >= learnStart:
                 agent.learnOnMiniBatch(minibatch_size)
+
+            if stepCounter % 1000 == 0:
+                agent.target_model.set_weights(agent.model.get_weights())
 
             if explorationRate > FINAL_EPSILON and stepCounter > learnStart:
                 explorationRate -= (INITIAL_EPSILON - FINAL_EPSILON) / EXPLORE
