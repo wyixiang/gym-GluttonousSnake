@@ -160,7 +160,7 @@ if __name__ == '__main__':
     warnings.filterwarnings("ignore")
     np.set_printoptions(suppress=True, precision=2, threshold=np.nan)
 
-    env = gym.make('Glu-v3')
+    env = gym.make('Glu-v1')
     outdir = '/tmp/GluttonousSnake_gym_experiments/'
 
     weights_path = './tmp/dqnnature/wights'

@@ -1,10 +1,11 @@
-#gym-GluttonousSnake
+# gym-GluttonousSnake
 本项目基于daishengdong的[Games游戏包](https://github.com/daishengdong/Games)中的GluttonousSnake
 
-我们使用gym环境对贪吃蛇游戏进行了封装和重新开发，目前已经开发完成三个项目：
- - Glu-v0 传统贪吃蛇
- - Glu-v1 贪吃蛇大作战（四向移动版）
- - Glu-v2 贪吃蛇大作战（360°移动版）
+我们使用gym环境对贪吃蛇游戏进行了封装和重新开发，目前已经开发完成四个项目：
+ - Glu-v0 传统贪吃蛇（3个动作）
+ - Glu-v1 传统贪吃蛇无边框（4个动作）
+ - Glu-v2 贪吃蛇大作战（4向移动版）
+ - Glu-v3 贪吃蛇大作战（360°移动版）
 
 ## Requirements
 
@@ -40,6 +41,10 @@ python3 multi2_rand.py
 
 
 ## 更新日志
+
+### 20181217
+1.重新整理环境编号，见readme  
+2.更新readme信息
 
 ### 20181216
 1.更新Glu-v3

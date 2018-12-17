@@ -6,13 +6,13 @@ register(
 )
 register(
     id='Glu-v1',
-    entry_point='gym_GluttonousSnake.envs:MultiGluttonousSnakeEnv',
+    entry_point='gym_GluttonousSnake.envs:GluttonousSnake2Env',
 )
 register(
     id='Glu-v2',
-    entry_point='gym_GluttonousSnake.envs:MultiGluttonousSnake2Env',
+    entry_point='gym_GluttonousSnake.envs:MultiGluttonousSnakeEnv',
 )
 register(
     id='Glu-v3',
-    entry_point='gym_GluttonousSnake.envs:GluttonousSnake2Env',
+    entry_point='gym_GluttonousSnake.envs:MultiGluttonousSnake2Env',
 )
